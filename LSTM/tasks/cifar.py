@@ -170,7 +170,7 @@ class CifarTask:
         test_model.eval()
         return test_model
 
-    def _create_dataset(self, data_root="/gf3/home/gks/project/sketch_reduce/data"):
+    def _create_dataset(self, data_root="/home/mist/data"):
         """Create train and test datasets"""
         if config['dataset_name'] == 'cifar10':
             dataset = torchvision.datasets.CIFAR10

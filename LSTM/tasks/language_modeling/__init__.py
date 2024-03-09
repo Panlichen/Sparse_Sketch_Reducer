@@ -7,6 +7,11 @@ import torch
 import torchtext
 from spacy.symbols import ORTH
 from torch.utils.data import DataLoader, dataloader
+from torchtext.vocab import Vocab
+from torchtext.data.utils import get_tokenizer
+from torchtext.datasets import WikiText2, WikiText103, PennTreebank
+from torchtext.data.functional import to_map_style_dataset
+from torchtext.vocab import build_vocab_from_iterator
 
 from mean_accumulator import MeanAccumulator
 
@@ -34,10 +39,10 @@ class LanguageModelingTask:
         self._epoch = 0
 
         torch.random.manual_seed(self._seed)
-        self.text, self.train_loader, self.val_loader = define_dataset(
+        self.text, self.train_loader, self.val_loader = define_dataset_v2(
             device,
             dataset_name,
-            '/gf3/home/gks/project/sketch_reduce/data/',
+            '/home/mist/data',
             batch_size=self._batch_size,
         )
 
@@ -220,6 +225,34 @@ class SplitBatchLoader:
             yield Batch(x, y, hidden)
 
 
+def define_model(TEXT, rnn_n_hidden=650, rnn_n_layers=3, rnn_tie_weights=False, drop_rate=0.4):
+    # get embdding size and num_tokens.
+    weight_matrix = TEXT.vocab.vectors
+
+    if weight_matrix is not None:
+        n_tokens, emb_size = weight_matrix.size(0), weight_matrix.size(1)
+    else:
+        n_tokens, emb_size = len(TEXT.vocab), rnn_n_hidden
+    if torch.distributed.get_rank()==0:
+        print(f'ntoken={n_tokens}, ninp={emb_size}, nhid={rnn_n_hidden}, nlayers={rnn_n_layers}')
+    # create model.
+    model = RNNModel(
+        rnn_type="LSTM",
+        ntoken=n_tokens,
+        ninp=emb_size,
+        nhid=rnn_n_hidden,
+        nlayers=rnn_n_layers,
+        tie_weights=rnn_tie_weights,
+        dropout=drop_rate,
+    )
+
+    # init the model.
+    if weight_matrix is not None:
+        model.encoder.weight.data.copy_(weight_matrix)
+
+    return model
+
+
 def define_dataset(
     device,
     dataset_name,
@@ -268,34 +301,6 @@ def define_dataset(
     return TEXT, train_loader, val_loader
 
 
-def define_model(TEXT, rnn_n_hidden=650, rnn_n_layers=3, rnn_tie_weights=False, drop_rate=0.4):
-    # get embdding size and num_tokens.
-    weight_matrix = TEXT.vocab.vectors
-
-    if weight_matrix is not None:
-        n_tokens, emb_size = weight_matrix.size(0), weight_matrix.size(1)
-    else:
-        n_tokens, emb_size = len(TEXT.vocab), rnn_n_hidden
-    if torch.distributed.get_rank()==0:
-        print(f'ntoken={n_tokens}, ninp={emb_size}, nhid={rnn_n_hidden}, nlayers={rnn_n_layers}')
-    # create model.
-    model = RNNModel(
-        rnn_type="LSTM",
-        ntoken=n_tokens,
-        ninp=emb_size,
-        nhid=rnn_n_hidden,
-        nlayers=rnn_n_layers,
-        tie_weights=rnn_tie_weights,
-        dropout=drop_rate,
-    )
-
-    # init the model.
-    if weight_matrix is not None:
-        model.encoder.weight.data.copy_(weight_matrix)
-
-    return model
-
-
 def _get_text():
     # scapy [conda install -c conda-forge spacy
     # python -m spacy download en_core_web_sm]
@@ -324,3 +329,51 @@ def _get_dataset(name, datasets_path):
     elif "ptb" in name:
         train, valid, test = torchtext.legacy.datasets.PennTreebank.splits(TEXT, root=datasets_path)
     return TEXT, train, valid, test
+
+
+def define_dataset_v2(
+    device,
+    dataset_name,
+    dataset_path,
+    batch_size,
+    rnn_use_pretrained_emb=False,
+    rnn_n_hidden=650,
+    reshuffle_per_epoch=True,
+    rnn_bptt_len=30,
+):
+    # 使用新的方法加载数据集
+    train_iter, valid_iter, test_iter = _get_dataset_v2(dataset_name, dataset_path)
+    
+    # 使用分布式计算确定工作进程的数量
+    n_workers = torch.distributed.get_world_size() if torch.distributed.is_available() else 1
+    
+    tokenizer = get_tokenizer("spacy", language="en_core_web_sm")
+    vocab = build_vocab_from_iterator(map(tokenizer, train_iter), specials=["<eos>", "<bos>", "<unk>"])
+    vocab.set_default_index(vocab["<unk>"])
+    
+    if rnn_use_pretrained_emb:
+        # 加载预训练的词向量
+        vectors = "glove.6B.{}d".format(rnn_n_hidden)
+        vocab.load_vectors(vectors)
+    
+    # 将数据集转换为Map样式
+    train_dataset = to_map_style_dataset(train_iter)
+    valid_dataset = to_map_style_dataset(valid_iter)
+    
+    # 创建DataLoader
+    train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=batch_size * n_workers, shuffle=reshuffle_per_epoch)
+    val_loader = torch.utils.data.DataLoader(valid_dataset, batch_size=batch_size * n_workers, shuffle=reshuffle_per_epoch)
+    
+    return vocab, train_loader, val_loader
+
+
+def _get_dataset_v2(name, datasets_path):
+    # 根据数据集名称加载数据集
+    if "wikitext2" in name:
+        print(f"datasets_path is {datasets_path}")
+        train_iter, valid_iter, test_iter = WikiText2(root=datasets_path, split=('train', 'valid', 'test'))
+    elif "wikitext103" in name:
+        train_iter, valid_iter, test_iter = WikiText103(root=datasets_path, split=('train', 'valid', 'test'))
+    elif "ptb" in name:
+        train_iter, valid_iter, test_iter = PennTreebank(root=datasets_path, split=('train', 'valid', 'test'))
+    return train_iter, valid_iter, test_iter

@@ -67,7 +67,7 @@ The configuration overrides we used for all our experiments can be found in the 
 #     log_verbosity=2,
 # )
 
-output_dir = "/gf3/home/gks/project/sketch_reduce/output.tmp"  # will be overwritten by run.py
+output_dir = "/home/mist/output.tmp"  # will be overwritten by run.py
 
 
 def main():
@@ -546,7 +546,7 @@ def tensor_nnz(grad):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--local_rank", type=int, default=0)
+    parser.add_argument("--local-rank", type=int, default=0)
     parser.add_argument("--local_world_size", type=int, default=1)
     args = parser.parse_args()
 
