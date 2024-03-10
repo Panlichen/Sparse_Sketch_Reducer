@@ -48,8 +48,8 @@ class LanguageModelingTask:
 
         global ITOS
         global STOI
-        ITOS = self.text.vocab.itos
-        STOI = self.text.vocab.stoi
+        ITOS = self.text.vocab.get_itos()
+        STOI = self.text.vocab.get_stoi()
 
         self._model = self._create_model()
         self._criterion = torch.nn.CrossEntropyLoss().to(self._device)
@@ -182,7 +182,7 @@ class LanguageModelingTask:
     def _create_model(self):
         """Create a PyTorch module for the model"""
         torch.random.manual_seed(self._seed)
-        model = define_model(self.text)
+        model = define_model_v2(self.text)
         model.to(self._device)
         model.train()
         return model
@@ -251,6 +251,39 @@ def define_model(TEXT, rnn_n_hidden=650, rnn_n_layers=3, rnn_tie_weights=False, 
         model.encoder.weight.data.copy_(weight_matrix)
 
     return model
+
+
+def define_model_v2(vocab, rnn_n_hidden=650, rnn_n_layers=3, rnn_tie_weights=False, drop_rate=0.4):
+    # Assuming 'vocab' is the vocabulary object obtained from 'build_vocab_from_iterator'
+    
+    # Adaptation for embedding size and number of tokens
+    if hasattr(vocab, 'vectors'):
+        weight_matrix = vocab.vectors
+        n_tokens, emb_size = weight_matrix.size(0), weight_matrix.size(1)
+    else:
+        n_tokens, emb_size = len(vocab), rnn_n_hidden
+    
+    # Distributed computing guard
+    if torch.distributed.is_initialized() and torch.distributed.get_rank() == 0:
+        print(f'ntoken={n_tokens}, ninp={emb_size}, nhid={rnn_n_hidden}, nlayers={rnn_n_layers}')
+
+    # Model instantiation
+    model = RNNModel(
+        rnn_type="LSTM",
+        ntoken=n_tokens,
+        ninp=emb_size,
+        nhid=rnn_n_hidden,
+        nlayers=rnn_n_layers,
+        tie_weights=rnn_tie_weights,
+        dropout=drop_rate,
+    )
+
+    # Weight matrix application
+    if hasattr(vocab, 'vectors'):
+        model.encoder.weight.data.copy_(weight_matrix)
+    
+    return model
+
 
 
 def define_dataset(
@@ -348,13 +381,13 @@ def define_dataset_v2(
     n_workers = torch.distributed.get_world_size() if torch.distributed.is_available() else 1
     
     tokenizer = get_tokenizer("spacy", language="en_core_web_sm")
-    vocab = build_vocab_from_iterator(map(tokenizer, train_iter), specials=["<eos>", "<bos>", "<unk>"])
-    vocab.set_default_index(vocab["<unk>"])
+    TEXT = build_vocab_from_iterator(map(tokenizer, train_iter), specials=["<eos>", "<bos>", "<unk>"])
+    TEXT.set_default_index(TEXT["<unk>"])
     
     if rnn_use_pretrained_emb:
         # 加载预训练的词向量
         vectors = "glove.6B.{}d".format(rnn_n_hidden)
-        vocab.load_vectors(vectors)
+        TEXT.load_vectors(vectors)
     
     # 将数据集转换为Map样式
     train_dataset = to_map_style_dataset(train_iter)
@@ -364,7 +397,7 @@ def define_dataset_v2(
     train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=batch_size * n_workers, shuffle=reshuffle_per_epoch)
     val_loader = torch.utils.data.DataLoader(valid_dataset, batch_size=batch_size * n_workers, shuffle=reshuffle_per_epoch)
     
-    return vocab, train_loader, val_loader
+    return TEXT, train_loader, val_loader
 
 
 def _get_dataset_v2(name, datasets_path):

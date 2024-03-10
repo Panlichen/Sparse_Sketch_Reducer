@@ -1,7 +1,7 @@
 # using this config as the configuration file
 
 
-config = {'average_reset_epoch_interval': 30,
+config_res = {'average_reset_epoch_interval': 30,
 'checkpoints': [0,1,10],
 'distributed_backend': 'nccl',
 'fix_conv_weight_norm': False,
@@ -28,6 +28,7 @@ config = {'average_reset_epoch_interval': 30,
 'seed': 1,
 'task_architecture': 'ResNet18',
 'task': 'LanguageModeling',
+# 'dataset_name': 'wikitext2',
 'dataset_name': 'wikitext2',
 'optimizer_reducer': 'Sketch_Embed_Reducer',
 'optimizer_memory': False,
@@ -37,7 +38,7 @@ config = {'average_reset_epoch_interval': 30,
 'warm_reducer': False
 }
 
-config_res = {'average_reset_epoch_interval': 30,
+config = {'average_reset_epoch_interval': 30,
 'checkpoints': [0,1,10],
 'distributed_backend': 'gloo',
 'fix_conv_weight_norm': False,

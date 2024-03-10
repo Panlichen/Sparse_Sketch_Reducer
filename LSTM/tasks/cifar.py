@@ -89,6 +89,14 @@ class CifarTask:
             - gradients (list of tensors in the same order as task.state())
             - bunch of metrics (dictionary)
         """
+
+        # 假设你的模型实例叫做 model
+        for name, param in self._model.named_parameters():
+            print(f"Layer: {name} | Device: {param.device}")
+
+        print(f"batch.x.device: {batch.x.device}")
+        print(f"batch.y.device: {batch.y.device}")
+
         self._zero_grad()
         with self._timer("batch.forward", float(self._epoch)):
             prediction = self._model(batch.x)

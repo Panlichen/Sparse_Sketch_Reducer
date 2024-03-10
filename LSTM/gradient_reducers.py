@@ -13,6 +13,7 @@ try:
 except ImportError:
     pass
 
+from CASQ import LSS
 
 class Reducer:
     def __init__(self, random_seed, device, timer):
