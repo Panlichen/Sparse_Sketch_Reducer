@@ -1,7 +1,7 @@
 # using this config as the configuration file
 
 
-config_res = {'average_reset_epoch_interval': 30,
+config = {'average_reset_epoch_interval': 30,
 'checkpoints': [0,1,10],
 'distributed_backend': 'nccl',
 'fix_conv_weight_norm': False,
@@ -38,7 +38,7 @@ config_res = {'average_reset_epoch_interval': 30,
 'warm_reducer': False
 }
 
-config = {'average_reset_epoch_interval': 30,
+config_res = {'average_reset_epoch_interval': 30,
 'checkpoints': [0,1,10],
 'distributed_backend': 'gloo',
 'fix_conv_weight_norm': False,

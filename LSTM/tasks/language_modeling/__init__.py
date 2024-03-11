@@ -403,8 +403,8 @@ def define_dataset_v2(
 def _get_dataset_v2(name, datasets_path):
     # 根据数据集名称加载数据集
     if "wikitext2" in name:
-        print(f"datasets_path is {datasets_path}")
         train_iter, valid_iter, test_iter = WikiText2(root=datasets_path, split=('train', 'valid', 'test'))
+        print(f"datasets_path is {datasets_path}, load dataset success")
     elif "wikitext103" in name:
         train_iter, valid_iter, test_iter = WikiText103(root=datasets_path, split=('train', 'valid', 'test'))
     elif "ptb" in name:
