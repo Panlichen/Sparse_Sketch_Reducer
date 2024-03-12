@@ -106,7 +106,7 @@ class Timer:
         if verbosity > self.verbosity_level:
             yield
             return
-
+        # 这段代码使用了Python的contextmanager装饰器和yield关键字来定义一个上下文管理器，用于测量代码块的执行时间。当进入with语句块时，代码首先同步CUDA（如果使用），记录开始时间，然后执行yield之前的代码。yield之后的代码会在with语句块结束时执行，此时再次同步CUDA并记录结束时间，从而计算出代码块的运行时间。
         # Measure the time
         self._cuda_sync()
         # change time_ns() to time()
@@ -496,7 +496,6 @@ def is_conv_param(parameter_name):
     needs a different treatment from the other weights
     """
     return "conv" in parameter_name and "weight" in parameter_name
-
 
 def is_batchnorm_param(parameter_name):
     """
