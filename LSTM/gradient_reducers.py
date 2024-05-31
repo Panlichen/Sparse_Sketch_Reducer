@@ -1631,8 +1631,8 @@ class CAS_Fast_Reducer(Reducer):
             code = self.CAS.encode(flat_tensors.buffer, self.CAS.compressor)
             coded_data_buffers = [torch.empty_like(torch.from_numpy(code['coded_data'])) for i in range(self.n_workers)]
             code_index_buffers = [torch.empty_like(torch.from_numpy(np.int32(code['coded_index']))) for i in range(self.n_workers)]
-            data_handel = all_gather(coded_data_buffers, torch.from_numpy(code['coded_data']), async_op=True)
-            index_handel = all_gather(code_index_buffers, torch.from_numpy(np.int32(code['coded_index'])), async_op=True)
+            data_handle = all_gather(coded_data_buffers, torch.from_numpy(code['coded_data']), async_op=True)
+            index_handle = all_gather(code_index_buffers, torch.from_numpy(np.int32(code['coded_index'])), async_op=True)
             # Byte_communicated +=  torch.from_numpy(code['coded_data']).nelement() * torch.from_numpy(code['coded_data']).element_size()
             # Byte_communicated +=  torch.from_numpy(np.int32(code['coded_index'])).nelement() * torch.from_numpy(np.int32(code['coded_index'])).element_size()
 
@@ -1643,10 +1643,10 @@ class CAS_Fast_Reducer(Reducer):
                 # if self.rank == 0:
                 #     print(f'grad {grad}, decode_grad {decode_tensor}')
                 mem.data[:] = grad - decode_tensor
-            data_handel.wait()
+            data_handle.wait()
             merged_code_data = torch.stack(coded_data_buffers).reshape(-1)
             
-            index_handel.wait()
+            index_handle.wait()
             merged_coded_index = torch.stack(code_index_buffers).reshape(self.n_workers, -1)
             # print( merged_code_data.size(),  merged_coded_index.size())
 
@@ -1716,8 +1716,8 @@ class CAS_Layer_LM_Reducer(Reducer):
             code = self.CAS.encode(high_rank_tensor_list.buffer, self.CAS.compressor)
             coded_data_buffers = [torch.empty_like(torch.from_numpy(code['coded_data'])) for i in range(self.n_workers)]
             code_index_buffers = [torch.empty_like(torch.from_numpy(np.int32(code['coded_index']))) for i in range(self.n_workers)]
-            data_handel = all_gather(coded_data_buffers, torch.from_numpy(code['coded_data']), async_op=True)
-            index_handel = all_gather(code_index_buffers, torch.from_numpy(np.int32(code['coded_index'])), async_op=True)
+            data_handle = all_gather(coded_data_buffers, torch.from_numpy(code['coded_data']), async_op=True)
+            index_handle = all_gather(code_index_buffers, torch.from_numpy(np.int32(code['coded_index'])), async_op=True)
             # Byte_communicated +=  torch.from_numpy(code['coded_data']).nelement() * torch.from_numpy(code['coded_data']).element_size()
             # Byte_communicated +=  torch.from_numpy(np.int32(code['coded_index'])).nelement() * torch.from_numpy(np.int32(code['coded_index'])).element_size()
             high_rank_tensor_list.buffer = torch.from_numpy(self.CAS.decode(code['coded_data'], code['coded_index'], high_rank_tensor_list.nelement(), code['lsstable_size'])).cuda(self.device)
@@ -1728,10 +1728,10 @@ class CAS_Layer_LM_Reducer(Reducer):
                 #     print(f'grad {grad}, decode_grad {decode_tensor}')
                 mem.data[:] = grad - decode_tensor            
 
-            data_handel.wait()
+            data_handle.wait()
             merged_code_data = torch.stack(coded_data_buffers).reshape(-1)
             
-            index_handel.wait()
+            index_handle.wait()
             merged_coded_index = torch.stack(code_index_buffers).reshape(self.n_workers, -1)
             # print( merged_code_data.size(),  merged_coded_index.size())
 
